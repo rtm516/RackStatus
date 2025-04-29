@@ -1,0 +1,70 @@
+name: Build MicroPython Firmware for Raspberry Pi Pico
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-arm-none-eabi \
+          libnewlib-arm-none-eabi \
+          build-essential \
+          cmake
+
+    - name: Checkout MicroPython
+      uses: actions/checkout@v4
+      with:
+        repository: micropython/micropython
+        path: micropython
+
+    - name: Build MicroPython Cross Compiler
+      working-directory: micropython
+      run: |
+        make -C mpy-cross
+    
+    - name: Checkout RackStatus
+      uses: actions/checkout@v4
+      with:
+        path: project
+    
+    - name: Copy project files
+      run: |
+        cp -r project/* micropython/ports/rp2/modules
+
+    - name: Build firmware for RPi Pico W
+      working-directory: micropython/ports/rp2
+      run: |
+        make BOARD=RPI_PICO_W submodules
+        make BOARD=RPI_PICO_W clean
+        make BOARD=RPI_PICO_W
+
+    - name: Upload firmware for RPi Pico W
+      uses: actions/upload-artifact@v4
+      with:
+        name: RackStatus-PicoW.uf2
+        path: micropython/ports/rp2/build-RPI_PICO_W/firmware.uf2
+      
+    - name: Build firmware for RPi Pico2 W
+      working-directory: micropython/ports/rp2
+      run: |
+        make BOARD=RPI_PICO2_W submodules
+        make BOARD=RPI_PICO2_W clean
+        make BOARD=RPI_PICO2_W
+
+    - name: Upload firmware for RPi Pico2 W
+      uses: actions/upload-artifact@v4
+      with:
+        name: RackStatus-Pico2W.uf2
+        path: micropython/ports/rp2/build-RPI_PICO2_W/firmware.uf2
