@@ -1,31 +1,24 @@
 from machine import Pin
-from utime import sleep
-from lib.microdot import Microdot
-import lib.mm_wlan as mm_wlan
+from lib.phew import server, connect_to_wifi, logging
 from lib.uping import ping
 import neopixel
 import json
-import asyncio
+import uasyncio
+import config
 
-## Config ##
-
-ssid = ''
-password = ''
-rackUnits = 12
-ledPerUnit = 3
-ledPin = Pin.board.GP0
-refreshTime = 10
-
-## Config ##
+# Enable debug logging
+logging.enable_logging_types(logging.LOG_DEBUG)
 
 # Setup LED strip
-leds = neopixel.NeoPixel(ledPin, ledPerUnit * rackUnits)
+leds = neopixel.NeoPixel(config.ledPin, config.ledPerUnit * config.rackUnits)
 
 # Connect to WLAN
-mm_wlan.connect_to_network(ssid, password)
-
-# Set up socket and start listening
-app = Microdot()
+logging.info(f"> connecting to wifi network '{config.ssid}'")
+ipAddr = connect_to_wifi(config.ssid, config.password, 10)
+if ipAddr:
+    logging.info(f"  - ip address: {ipAddr}")
+else:
+    logging.error('  - failed to connect to wifi')
 
 # Initialize server status
 serverStatus = []
@@ -41,10 +34,10 @@ except OSError:
     
 
 # Fill out the serverStatus with default values
-for i in range(rackUnits - len(serverStatus)):
+for i in range(config.rackUnits - len(serverStatus)):
     serverStatus.append({
         'type': 'none',
-        'name': f'U{rackUnits-i}', # Cosmetic for web UI
+        'name': f'U{config.rackUnits-i}', # Cosmetic for web UI
         'target': '',
         'status': 'none'
     })
@@ -55,28 +48,34 @@ def saveStatus():
 
 saveStatus()
 
-@app.route('/')
+@server.route('/')
 def index(request):
     return 'TODO some config page'
 
-@app.route('/status', methods=['GET', 'POST'])
+@server.route('/status', methods=['GET', 'POST'])
 def status(request):
     global serverStatus
     if request.method == 'POST':
-        data = request.json
+        data = request.data
         if data:
             # TODO validate data
             serverStatus = data
             saveStatus()
+            return json.dumps({'status': 'ok'}), 200, {'Content-Type': 'application/json'}
+        else:
+            return json.dumps({'status': 'error', 'message': 'No data provided'}), 400, {'Content-Type': 'application/json'}
     else:
         # Return current status
-        return serverStatus
+        return json.dumps(serverStatus), 200, {'Content-Type': 'application/json'}
 
+@server.catchall()
+def my_catchall(request):
+    return "No matching route", 404
 
 async def statusUpdate():
     while True:
-        # 
-        for i in range(rackUnits):
+        logging.debug("> status update")
+        for i in range(config.rackUnits):
             currentStatus = serverStatus[i]
             if currentStatus['type'] == 'ping':
                 pingData = ping(currentStatus['target'], quiet=True)
@@ -93,10 +92,10 @@ async def statusUpdate():
                 currentStatus['status'] = 'none'
 
             # Debug log
-            print(f"{i}: {currentStatus['name']} ({currentStatus['target']}) - {currentStatus['type']} - {currentStatus['status']}")
+            logging.debug(f"  - {i}: {currentStatus['name']} ({currentStatus['target']}) - {currentStatus['type']} - {currentStatus['status']}")
 
         # Build LED string
-        for i in range(rackUnits):
+        for i in range(config.rackUnits):
             currentStatus = serverStatus[i]
             if currentStatus['status'] == 'green':
                 color = (0, 255, 0)
@@ -107,13 +106,13 @@ async def statusUpdate():
             else:
                 color = (0, 0, 0)
             
-            for j in range(ledPerUnit):
-                leds[i * ledPerUnit + j] = color
+            for j in range(config.ledPerUnit):
+                leds[i * config.ledPerUnit + j] = color
         leds.write()
 
 
-        sleep(refreshTime)
+        await uasyncio.sleep(config.refreshTime)
 
-app.run()
-
-asyncio.run(statusUpdate())
+# Setup status update task and start server
+uasyncio.get_event_loop().create_task(statusUpdate())
+server.run()
