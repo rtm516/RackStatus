@@ -10,7 +10,9 @@ import config
 logging.enable_logging_types(logging.LOG_DEBUG)
 
 # Setup LED strip
-leds = neopixel.NeoPixel(config.ledPin, config.ledPerUnit * config.rackUnits)
+leds = neopixel.NeoPixel(Pin(config.ledPin), config.ledPerUnit * config.rackUnits)
+
+# TODO Initial boot start hotspot and wait for reconfiguration
 
 # Connect to WLAN
 logging.info(f"> connecting to wifi network '{config.ssid}'")
@@ -23,13 +25,13 @@ else:
 # Initialize server status
 serverStatus = []
 
-serverStatusFile = '/serverStatus.json'
+STATUS_FILE = 'status.json'
 # Check if serverStatus.json exists, if not create it
 try:
-    with open(serverStatusFile, 'r') as f:
+    with open(STATUS_FILE, 'r') as f:
         serverStatus = json.loads(f.read())
 except OSError:
-    with open(serverStatusFile, 'w') as f:
+    with open(STATUS_FILE, 'w') as f:
         f.write('[]')
     
 
@@ -43,7 +45,7 @@ for i in range(config.rackUnits - len(serverStatus)):
     })
 
 def saveStatus(): 
-    with open(serverStatusFile, 'w') as f:
+    with open(STATUS_FILE, 'w') as f:
         f.write(json.dumps(serverStatus))
 
 saveStatus()
@@ -83,6 +85,9 @@ async def statusUpdate():
         logging.debug("> status update")
         for i in range(config.rackUnits):
             currentStatus = serverStatus[i]
+
+            # TODO Handle multiple units with the same target and dont check them multiple times
+
             if currentStatus['type'] == 'ping':
                 pingData = ping(currentStatus['target'], quiet=True)
 
@@ -97,7 +102,6 @@ async def statusUpdate():
             else:
                 currentStatus['status'] = 'none'
 
-            # Debug log
             logging.debug(f"  - {i}: {currentStatus['name']} ({currentStatus['target']}) - {currentStatus['type']} - {currentStatus['status']}")
 
         # Build LED string
@@ -115,7 +119,6 @@ async def statusUpdate():
             for j in range(config.ledPerUnit):
                 leds[i * config.ledPerUnit + j] = color
         leds.write()
-
 
         await uasyncio.sleep(config.refreshTime)
 
