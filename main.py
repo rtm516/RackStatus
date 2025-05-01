@@ -1,5 +1,5 @@
 from machine import Pin
-from lib.phew import server, connect_to_wifi, logging
+from lib.phew import server, connect_to_wifi, logging, render_template
 from lib.uping import ping
 import neopixel
 import json
@@ -50,7 +50,7 @@ saveStatus()
 
 @server.route('/')
 def index(request):
-    return 'TODO some config page'
+    return render_template('app_templates/index.html', config=config)
 
 @server.route('/status', methods=['GET', 'POST'])
 def status(request):
@@ -59,8 +59,14 @@ def status(request):
         data = request.data
         if data:
             # TODO validate data
+
+            # Set the status to none for all units
+            for i in range(len(data)):
+                data[i]['status'] = 'none'
+
             serverStatus = data
             saveStatus()
+
             return json.dumps({'status': 'ok'}), 200, {'Content-Type': 'application/json'}
         else:
             return json.dumps({'status': 'error', 'message': 'No data provided'}), 400, {'Content-Type': 'application/json'}
