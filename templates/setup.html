@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RackStatus - Setup</title>
+    <link href="bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body>
+	<div class="container">
+		<h1>RackStatus - Setup</h1>
+		{{("<h2>" + message + "</h2>") if message else ""}}
+		<form action="/setup" method="POST">
+			<div class="mb-3">
+				<label for="inputSsid" class="form-label">SSID</label>
+				<select class="form-select" id="inputSsid" name="ssidDrop">
+					<option value="">Manual input</option>
+					{{"".join(f'<option value="{ssid}">{ssid}</option>' for ssid in ssids)}}
+				</select>
+				or
+				<input type="text" class="form-control" name="ssidManual">
+			</div>
+			<div class="mb-3">
+				<label for="inputPassword" class="form-label">Password</label>
+				<input type="password" class="form-control" id="inputPassword" name="password">
+			</div>
+			<div class="d-grid">
+				<button type="submit" class="btn btn-primary">Save</button>
+			</div>
+		</form>
+	</div>
+  </body>
+</html>

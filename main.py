@@ -4,15 +4,23 @@ from lib.uping import ping
 import neopixel
 import json
 import uasyncio
-import config
+from config import Config
+from setup import startSetup
 
 # Enable debug logging
 logging.enable_logging_types(logging.LOG_DEBUG)
+
+# Load configuration
+config = Config()
 
 # Setup LED strip
 leds = neopixel.NeoPixel(Pin(config.ledPin), config.ledPerUnit * config.rackUnits)
 
 # TODO Initial boot start hotspot and wait for reconfiguration
+if (config.ssid == ''):
+    logging.info('> no wifi configured, doing initial setup')
+    startSetup()
+    pass
 
 # Connect to WLAN
 logging.info(f"> connecting to wifi network '{config.ssid}'")
@@ -52,7 +60,7 @@ saveStatus()
 
 @server.route('/')
 def index(request):
-    return render_template('app_templates/index.html', config=config)
+    return render_template('templates/index.html', config=config)
 
 @server.route('/status', methods=['GET', 'POST'])
 def status(request):
@@ -77,7 +85,7 @@ def status(request):
         return json.dumps(serverStatus), 200, {'Content-Type': 'application/json'}
 
 @server.catchall()
-def my_catchall(request):
+def catchall(request):
     return "No matching route", 404
 
 async def statusUpdate():
